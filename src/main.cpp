@@ -1,23 +1,66 @@
+#define WIDTH 272
+#define HEIGHT 144
+#define PIXEL_SIZE 5
+
+// Example function to modify the pixel buffer
+void draw_rect(char *pixel_buf, int x, int y, int w, int h, char r, char g, char b) {
+    for (int i = 0; i < w; i++) {
+        for (int j = 0; j < h; j++) {
+            // IIRC the color order is GRB, but ideally 
+            // make it so swapping colors isn't hard in case
+            // I'm wrong. For now render RGB
+            pixel_buf[(y + j) * WIDTH * 4 + (x + i) * 4 + 0] = r;
+            pixel_buf[(y + j) * WIDTH * 4 + (x + i) * 4 + 1] = g;
+            pixel_buf[(y + j) * WIDTH * 4 + (x + i) * 4 + 2] = b;
+            // This fourth byte has to exist for alignment reasons, can hold whatever as it's never read
+            pixel_buf[(y + j) * WIDTH * 4 + (x + i) * 4 + 3] = 0;
+        }
+    }
+}
+
+
+// Runs once at startup
+void init(char *pixel_buf /* Put whatever else you want in here for game data for ex I decided to pass an int */, int *ind) {
+    // Clear screen to a dim blue
+    draw_rect(pixel_buf, 0, 0, WIDTH, HEIGHT, 50, 50, 100);
+    // Init ind
+    *ind = 0;
+}
+ 
+void update(char *pixel_buf, int *ind) {
+    // Change screen gradually
+    for (int i = 0; i < 40; i++) {
+        // Update one pixel at a time
+        pixel_buf[*ind] += 100;
+        *ind += 4;
+        // Wrap ind
+        if (*ind >= WIDTH * HEIGHT * 4) {
+            *ind = (*ind % 4) + 1;
+        }
+        if (*ind == 3) {
+            *ind = 0;
+        }
+    }
+}
+
+///////////////////
+// Ignore below here, this is all example code 
+// so you can see what your code is doing.
+// Unless you want to add more game state
+///////////////////
+
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL_init.h>
-#include <SDL3_ttf/SDL_ttf.h>
-#include <SDL3_mixer/SDL_mixer.h>
-#include <SDL3_image/SDL_image.h>
 #include <cmath>
 #include <string_view>
-#include <filesystem>
 
-constexpr uint32_t windowStartWidth = 400;
-constexpr uint32_t windowStartHeight = 400;
+static int ind = 0;
 
 struct AppContext {
     SDL_Window* window;
     SDL_Renderer* renderer;
-    SDL_Texture* messageTex, *imageTex;
-    SDL_FRect messageDest;
-    SDL_AudioDeviceID audioDevice;
-    Mix_Music* music;
+    SDL_Texture* texture;
     SDL_AppResult app_quit = SDL_APP_CONTINUE;
 };
 
@@ -28,18 +71,12 @@ SDL_AppResult SDL_Fail(){
 
 SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     // init the library, here we make a window so we only need the Video capabilities.
-    if (not SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)){
-        return SDL_Fail();
-    }
-    
-    // init TTF
-    if (not TTF_Init()) {
+    if (not SDL_Init(SDL_INIT_VIDEO)){
         return SDL_Fail();
     }
     
     // create a window
-   
-    SDL_Window* window = SDL_CreateWindow("SDL Minimal Sample", windowStartWidth, windowStartHeight, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
+    SDL_Window* window = SDL_CreateWindow("SDL Minimal Sample", WIDTH * PIXEL_SIZE, HEIGHT * PIXEL_SIZE, 0);
     if (not window){
         return SDL_Fail();
     }
@@ -49,68 +86,10 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     if (not renderer){
         return SDL_Fail();
     }
-    
-    // load the font
-#if __ANDROID__
-    std::filesystem::path basePath = "";   // on Android we do not want to use basepath. Instead, assets are available at the root directory.
-#else
-    auto basePathPtr = SDL_GetBasePath();
-     if (not basePathPtr){
-        return SDL_Fail();
-    }
-     const std::filesystem::path basePath = basePathPtr;
-#endif
 
-    const auto fontPath = basePath / "Inter-VariableFont.ttf";
-    TTF_Font* font = TTF_OpenFont(fontPath.string().c_str(), 36);
-    if (not font) {
-        return SDL_Fail();
-    }
-
-    // render the font to a surface
-    const std::string_view text = "Hello SDL!";
-    SDL_Surface* surfaceMessage = TTF_RenderText_Solid(font, text.data(), text.length(), { 255,255,255 });
-
-    // make a texture from the surface
-    SDL_Texture* messageTex = SDL_CreateTextureFromSurface(renderer, surfaceMessage);
-
-    // we no longer need the font or the surface, so we can destroy those now.
-    TTF_CloseFont(font);
-    SDL_DestroySurface(surfaceMessage);
-
-    // load the SVG
-    auto svg_surface = IMG_Load((basePath / "gs_tiger.svg").string().c_str());
-    SDL_Texture* tex = SDL_CreateTextureFromSurface(renderer, svg_surface);
-    SDL_DestroySurface(svg_surface);
-    
-
-    // get the on-screen dimensions of the text. this is necessary for rendering it
-    auto messageTexProps = SDL_GetTextureProperties(messageTex);
-    SDL_FRect text_rect{
-            .x = 0,
-            .y = 0,
-            .w = float(SDL_GetNumberProperty(messageTexProps, SDL_PROP_TEXTURE_WIDTH_NUMBER, 0)),
-            .h = float(SDL_GetNumberProperty(messageTexProps, SDL_PROP_TEXTURE_HEIGHT_NUMBER, 0))
-    };
-
-    // init SDL Mixer
-    auto audioDevice = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL);
-    if (not audioDevice) {
-        return SDL_Fail();
-    }
-    if (not Mix_OpenAudio(audioDevice, NULL)) {
-        return SDL_Fail();
-    }
-
-    // load the music
-    auto musicPath = basePath / "the_entertainer.ogg";
-    auto music = Mix_LoadMUS(musicPath.string().c_str());
-    if (not music) {
-        return SDL_Fail();
-    }
-
-    // play the music (does not loop)
-    Mix_PlayMusic(music, 0);
+    // Make the render texture
+    SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_XBGR8888, SDL_TEXTUREACCESS_STREAMING, WIDTH, HEIGHT);
+    SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
     
     // print some information about the window
     SDL_ShowWindow(window);
@@ -129,12 +108,15 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     *appstate = new AppContext{
        .window = window,
        .renderer = renderer,
-       .messageTex = messageTex,
-       .imageTex = tex,
-       .messageDest = text_rect,
-       .audioDevice = audioDevice,
-       .music = music,
+       .texture = texture,
     };
+
+    // Call init
+    char* pixel_buf;
+    int temp;
+    SDL_LockTexture(texture, NULL, (void**)&pixel_buf, &temp);
+    init(pixel_buf, &ind);
+    SDL_UnlockTexture(texture);
     
     SDL_SetRenderVSync(renderer, -1);   // enable vysnc
     
@@ -165,9 +147,14 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     SDL_SetRenderDrawColor(app->renderer, red, green, blue, SDL_ALPHA_OPAQUE);
     SDL_RenderClear(app->renderer);
 
+    char* pixel_buf;
+    int temp;
+    SDL_LockTexture(app->texture, NULL, (void**)&pixel_buf, &temp);
+    update((char *)pixel_buf, &ind);
+    SDL_UnlockTexture(app->texture);
+
     // Renderer uses the painter's algorithm to make the text appear above the image, we must render the image first.
-    SDL_RenderTexture(app->renderer, app->imageTex, NULL, NULL);
-    SDL_RenderTexture(app->renderer, app->messageTex, NULL, &app->messageDest);
+    SDL_RenderTexture(app->renderer, app->texture, NULL, NULL);
 
     SDL_RenderPresent(app->renderer);
 
@@ -179,16 +166,10 @@ void SDL_AppQuit(void* appstate, SDL_AppResult result) {
     if (app) {
         SDL_DestroyRenderer(app->renderer);
         SDL_DestroyWindow(app->window);
-
-        Mix_FadeOutMusic(1000);  // prevent the music from abruptly ending.
-        Mix_FreeMusic(app->music); // this call blocks until the music has finished fading
-        Mix_CloseAudio();
-        SDL_CloseAudioDevice(app->audioDevice);
+        SDL_DestroyTexture(app->texture);
 
         delete app;
     }
-    TTF_Quit();
-    Mix_Quit();
 
     SDL_Log("Application quit successfully!");
     SDL_Quit();
