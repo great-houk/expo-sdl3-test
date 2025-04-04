@@ -18,30 +18,39 @@ void draw_rect(char *pixel_buf, int x, int y, int w, int h, char r, char g, char
     }
 }
 
+// Function to 
+void init_asteroid(char *pixel_buf, int *ind) { 
+    // Create asteroid rectangle. Initalize to light blue
+    draw_rect(pixel_buf, 100, 100, 20, 20, 173, 216, 230);
+}
+
 
 // Runs once at startup
 void init(char *pixel_buf /* Put whatever else you want in here for game data for ex I decided to pass an int */, int *ind) {
-    // Clear screen to a dim blue
-    draw_rect(pixel_buf, 0, 0, WIDTH, HEIGHT, 50, 50, 100);
+    // Set background to black
+    draw_rect(pixel_buf, 0, 0, WIDTH, HEIGHT, 0, 0, 0);
+    init_asteroid(pixel_buf, ind);
     // Init ind
     *ind = 0;
 }
- 
+
 void update(char *pixel_buf, int *ind) {
     // Change screen gradually
-    for (int i = 0; i < 40; i++) {
-        // Update one pixel at a time
-        pixel_buf[*ind] += 100;
-        *ind += 4;
-        // Wrap ind
-        if (*ind >= WIDTH * HEIGHT * 4) {
-            *ind = (*ind % 4) + 1;
-        }
-        if (*ind == 3) {
-            *ind = 0;
-        }
-    }
+    // for (int i = 0; i < 40; i++) {
+    //     // Update one pixel at a time
+    //     pixel_buf[*ind] += 100;
+    //     *ind += 4;
+    //     // Wrap ind
+    //     if (*ind >= WIDTH * HEIGHT * 4) {
+    //         *ind = (*ind % 4) + 1;
+    //     }
+    //     if (*ind == 3) {
+    //         *ind = 0;
+    //     }
+    // }
 }
+
+
 
 ///////////////////
 // Ignore below here, this is all example code 
