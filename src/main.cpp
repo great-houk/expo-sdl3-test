@@ -1,6 +1,8 @@
 #define WIDTH 272
 #define HEIGHT 144
 #define PIXEL_SIZE 5
+#define MAX_ASTEROIDS 10
+
 
 // Example function to modify the pixel buffer
 void draw_rect(char *pixel_buf, int x, int y, int w, int h, char r, char g, char b) {
@@ -18,36 +20,77 @@ void draw_rect(char *pixel_buf, int x, int y, int w, int h, char r, char g, char
     }
 }
 
-// Function to 
-void init_asteroid(char *pixel_buf, int *ind) { 
-    // Create asteroid rectangle. Initalize to light blue
-    draw_rect(pixel_buf, 100, 100, 20, 20, 173, 216, 230);
+struct Asteroid {
+    int x;
+    int y;
+    int width;
+    int height;
+    float speed;
+};
+
+// Array to store all asteroids
+struct Asteroid asteroids[MAX_ASTEROIDS];
+int asteroid_count = 0;
+
+// Function to initialize an asteroid
+void init_asteroid(char *pixel_buf, int x, int y, int width, int height, float speed) { 
+    // Check if we have room for another asteroid
+    if (asteroid_count >= MAX_ASTEROIDS) {
+        return; // No more room
+    }
+    
+    // Initialize asteroid fields
+    asteroids[asteroid_count].x = x;
+    asteroids[asteroid_count].y = y;
+    asteroids[asteroid_count].width = width;
+    asteroids[asteroid_count].height = height;
+    asteroids[asteroid_count].speed = speed;
+
+    // Create asteroid rectangle. Initialize to light blue
+    draw_rect(pixel_buf, asteroids[asteroid_count].x, asteroids[asteroid_count].y, 
+              asteroids[asteroid_count].width, asteroids[asteroid_count].height, 86, 107, 114);
+    
+    // Increment the count after adding the asteroid
+    asteroid_count++;
 }
 
+void move_asteroid(char *pixel_buf, struct Asteroid *myAsteroid) {
+    // Update the asteroid's position based on its speed
+    myAsteroid->x += myAsteroid->speed;
+    
+    // Handle wrapping around the screen
+    if (myAsteroid->x > WIDTH) {
+        // If the asteroid goes off the right edge, wrap to the left
+        myAsteroid->x = -myAsteroid->width;
+    } else if (myAsteroid->x + myAsteroid->width < 0) {
+        // If the asteroid goes off the left edge, wrap to the right
+        myAsteroid->x = WIDTH;
+    }
+    
+    // Redraw the asteroid at its new position
+    draw_rect(pixel_buf, myAsteroid->x, myAsteroid->y, myAsteroid->width, myAsteroid->height, 86, 107, 114);
+}
 
 // Runs once at startup
-void init(char *pixel_buf /* Put whatever else you want in here for game data for ex I decided to pass an int */, int *ind) {
+void init(char *pixel_buf, int *ind) {
     // Set background to black
     draw_rect(pixel_buf, 0, 0, WIDTH, HEIGHT, 0, 0, 0);
-    init_asteroid(pixel_buf, ind);
+    
+    // Initialize the asteroid with a very slow speed (0.2 pixels per frame)
+    init_asteroid(pixel_buf, 0, HEIGHT/2 - 10, 20, 20, 1.0);
+    
     // Init ind
     *ind = 0;
 }
 
 void update(char *pixel_buf, int *ind) {
-    // Change screen gradually
-    // for (int i = 0; i < 40; i++) {
-    //     // Update one pixel at a time
-    //     pixel_buf[*ind] += 100;
-    //     *ind += 4;
-    //     // Wrap ind
-    //     if (*ind >= WIDTH * HEIGHT * 4) {
-    //         *ind = (*ind % 4) + 1;
-    //     }
-    //     if (*ind == 3) {
-    //         *ind = 0;
-    //     }
-    // }
+    // Clear the screen (or just the area where the asteroid was)
+    draw_rect(pixel_buf, 0, 0, WIDTH, HEIGHT, 0, 0, 0);
+    
+    // Move and redraw all asteroids
+    for (int i = 0; i < asteroid_count; i++) {
+        move_asteroid(pixel_buf, &asteroids[i]);
+    }
 }
 
 
