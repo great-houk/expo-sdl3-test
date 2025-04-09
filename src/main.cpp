@@ -1,26 +1,19 @@
 #define WIDTH 272
 #define HEIGHT 144
 #define PIXEL_SIZE 5
-#define MAX_ASTEROIDS 8
+#define MAX_ASTEROIDS 10
 
 #include <cmath> // For fmod function
 #include <stdio.h> // For printf function
 #include <stdlib.h> // For rand function
 
-// Function to generate a random speed between -0.1 and +0.1 with minimum absolute value of 0.05
+// Function to generate a random speed of either 0.1 or -0.1
 float generate_random_speed() {
     // Generate a random number between 0 and 1
     float random_value = (float)rand() / RAND_MAX;
     
-    // Map to range -0.1 to 0.1
-    float speed = random_value * 0.2f - 0.1f;
-    
-    // Ensure minimum absolute speed of 0.05
-    if (speed > -0.05f && speed < 0.05f) {
-        speed = (speed > 0) ? 0.05f : -0.05f;
-    }
-    
-    return speed;
+    // Return either 0.1 or -0.1 based on the random value
+    return (random_value < 0.5f) ? 0.1f : -0.1f;
 }
 
 // Example function to modify the pixel buffer
@@ -116,12 +109,29 @@ void move_asteroid(char *pixel_buf, struct Asteroid *myAsteroid) {
         myAsteroid->y = HEIGHT;
     }
     
+    // Debug output to check asteroid position
+    printf("Asteroid position: x=%.2f, y=%.2f\n", myAsteroid->x, myAsteroid->y);
+    
     // Convert float position to int for drawing
     int draw_x = (int)myAsteroid->x;
     int draw_y = (int)myAsteroid->y;
     
     // Redraw the asteroid at its new position
     draw_rect(pixel_buf, draw_x, draw_y, myAsteroid->width, myAsteroid->height, 86, 107, 114);
+}
+
+// Function to draw a player (cursor-shaped)
+void draw_player(char *pixel_buf, float x, float y) {
+    // Convert float position to int for drawing
+    int draw_x = (int)x;
+    int draw_y = (int)y;
+    
+    // Draw a simple cursor shape (white color - using 7-bit values 0-127)
+    // Main cursor body (vertical line)
+    draw_rect(pixel_buf, draw_x, draw_y, 2, 8, 127, 127, 127);
+    
+    // Cursor head (horizontal line)
+    draw_rect(pixel_buf, draw_x - 2, draw_y + 6, 6, 2, 127, 127, 127);
 }
 
 // Runs once at startup
@@ -141,6 +151,9 @@ void init(char *pixel_buf, int *ind) {
         init_asteroid(pixel_buf, rand_x, rand_y, 10, 10, rand_speed_x, rand_speed_y);
     }
     
+    // Draw the player at the center of the screen
+    draw_player(pixel_buf, WIDTH / 2, HEIGHT / 2);
+    
     // Init ind
     *ind = 0;
 }
@@ -153,6 +166,9 @@ void update(char *pixel_buf, int *ind) {
     for (int i = 0; i < asteroid_count; i++) {
         move_asteroid(pixel_buf, &asteroids[i]);
     }
+    
+    // Redraw the player at the center of the screen
+    draw_player(pixel_buf, WIDTH / 2, HEIGHT / 2);
 }
 
 ///////////////////
