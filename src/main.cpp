@@ -1,21 +1,38 @@
-#include <SDL3/SDL.h>
-#include <SDL3/SDL_main.h>
-#include <SDL3/SDL_init.h>
-#include <SDL3/SDL_keyboard.h>
-#include <SDL3/SDL_scancode.h>
-#include <SDL3/SDL_stdinc.h>  // For SDL types
-
-
 #define WIDTH 272
 #define HEIGHT 144
 #define PIXEL_SIZE 5
 #define MAX_ASTEROIDS 10
 
-// Forward declarations for struct types
-struct Asteroid;
-struct Ship;
-struct Bullet;
+#include <cmath> // For fmod function
+#include <stdio.h> // For printf function
 
+// Example function to modify the pixel buffer
+void draw_rect(char *pixel_buf, int x, int y, int w, int h, char r, char g, char b) {
+    // Check if the rectangle is completely outside the screen
+    if (x >= WIDTH || y >= HEIGHT || x + w <= 0 || y + h <= 0) {
+        return; // Don't draw if completely outside
+    }
+    
+    // Clamp coordinates to screen boundaries
+    int start_x = (x < 0) ? 0 : x;
+    int start_y = (y < 0) ? 0 : y;
+    int end_x = (x + w > WIDTH) ? WIDTH : x + w;
+    int end_y = (y + h > HEIGHT) ? HEIGHT : y + h;
+    
+    // Draw only the visible portion
+    for (int i = start_x; i < end_x; i++) {
+        for (int j = start_y; j < end_y; j++) {
+            // IIRC the color order is GRB, but ideally 
+            // make it so swapping colors isn't hard in case
+            // I'm wrong. For now render RGB
+            pixel_buf[j * WIDTH * 4 + i * 4 + 0] = r;
+            pixel_buf[j * WIDTH * 4 + i * 4 + 1] = g;
+            pixel_buf[j * WIDTH * 4 + i * 4 + 2] = b;
+            // This fourth byte has to exist for alignment reasons, can hold whatever as it's never read
+            pixel_buf[j * WIDTH * 4 + i * 4 + 3] = 0;
+        }
+    }
+}
 
 struct Asteroid {
     float x;
@@ -26,94 +43,105 @@ struct Asteroid {
     float speed_y;
 };
 
-struct Ship {
-    float x;
-    float y;
-    float velocity_x;
-    float velocity_y;
-    float angle;  // in degrees
-    bool thrusting;
-};
-
-struct Bullet {
-    float x;
-    float y;
-    float velocity_x;
-    float velocity_y;
-    bool active;
-};
-
 // Array to store all asteroids
 struct Asteroid asteroids[MAX_ASTEROIDS];
 int asteroid_count = 0;
 
-// Ship instance
-struct Ship ship;
-
-// Example function to modify the pixel buffer
-void draw_rect(char *pixel_buf, int x, int y, int w, int h, char r, char g, char b) {
-    for (int i = 0; i < w; i++) {
-        for (int j = 0; j < h; j++) {
-            // IIRC the color order is GRB, but ideally 
-            // make it so swapping colors isn't hard in case
-            // I'm wrong. For now render RGB
-            pixel_buf[(y + j) * WIDTH * 4 + (x + i) * 4 + 0] = r;
-            pixel_buf[(y + j) * WIDTH * 4 + (x + i) * 4 + 1] = g;
-            pixel_buf[(y + j) * WIDTH * 4 + (x + i) * 4 + 2] = b;
-            // This fourth byte has to exist for alignment reasons, can hold whatever as it's never read
-            pixel_buf[(y + j) * WIDTH * 4 + (x + i) * 4 + 3] = 0;
-        }
-    }
-}
-
 // Function to initialize an asteroid
-void init_asteroid(char *pixel_buf, float x, float y, int width, int height, float speed_x, float speed_y) { 
+void init_asteroid(char *pixel_buf, float x, float y, int width, int height, float speed_x, float speed_y) {
     // Check if we have room for another asteroid
     if (asteroid_count >= MAX_ASTEROIDS) {
         return; // No more room
     }
     
-    // Initialize asteroid fields
+    // Initialize the asteroid
     asteroids[asteroid_count].x = x;
     asteroids[asteroid_count].y = y;
     asteroids[asteroid_count].width = width;
     asteroids[asteroid_count].height = height;
     asteroids[asteroid_count].speed_x = speed_x;
-    asteroids[asteroid_count].speed_y = speed_y;    
-
-    // Convert floating-point position to integer for drawing
+    asteroids[asteroid_count].speed_y = speed_y;
+    
+    // Convert float position to int for drawing
     int draw_x = (int)asteroids[asteroid_count].x;
     int draw_y = (int)asteroids[asteroid_count].y;
-
-    // Create asteroid rectangle. Initialize to light blue
-    draw_rect(pixel_buf, draw_x, draw_y, 
-              asteroids[asteroid_count].width, asteroids[asteroid_count].height, 86, 107, 114);
     
-    // Increment the count after adding the asteroid
+    // Draw the asteroid
+    draw_rect(pixel_buf, draw_x, draw_y, width, height, 86, 107, 114);
+    
+    // Increment the asteroid count
     asteroid_count++;
+}
+
+void move_asteroid(char *pixel_buf, struct Asteroid *myAsteroid) {
+    // Update the asteroid's position based on its speed
+    myAsteroid->x += myAsteroid->speed_x;
+    myAsteroid->y += myAsteroid->speed_y;
+    
+    // Handle wrapping around the screen horizontally
+    if (myAsteroid->x > WIDTH) {
+        // If the asteroid goes off the right edge, wrap to the left
+        myAsteroid->x = 0 - myAsteroid->width;
+    } else if (myAsteroid->x + myAsteroid->width < 0) {
+        // If the asteroid goes off the left edge, wrap to the right
+        myAsteroid->x = WIDTH + myAsteroid->width;
+    }
+
+    // Handle wrapping around the screen vertically
+    // Check if the asteroid is completely below the screen
+    if (myAsteroid->y > HEIGHT) {
+        // Wrap to the top of the screen
+        myAsteroid->y = 0 - myAsteroid->height;
+    } 
+    // Check if the asteroid is completely above the screen
+    else if (myAsteroid->y + myAsteroid->height < 0) {
+        // Wrap to the bottom of the screen
+        myAsteroid->y = HEIGHT + myAsteroid->height;
+    }
+    
+    // Debug output to check asteroid position
+    printf("Asteroid position: x=%.2f, y=%.2f\n", myAsteroid->x, myAsteroid->y);
+    
+    // Convert float position to int for drawing
+    int draw_x = (int)myAsteroid->x;
+    int draw_y = (int)myAsteroid->y;
+    
+    // Redraw the asteroid at its new position
+    draw_rect(pixel_buf, draw_x, draw_y, myAsteroid->width, myAsteroid->height, 86, 107, 114);
 }
 
 // Runs once at startup
 void init(char *pixel_buf, int *ind) {
     // Set background to black
     draw_rect(pixel_buf, 0, 0, WIDTH, HEIGHT, 0, 0, 0);
-    init_asteroid(pixel_buf, 100, 100, 10, 10, 1, 1);
+    
+    // Initialize the asteroid with a very slow speed (0.2 pixels per frame)
+    init_asteroid(pixel_buf, 100, 0, 10, 10, 0.2f, 0.05f);
+    
     // Init ind
     *ind = 0;
 }
 
 void update(char *pixel_buf, int *ind) {
-    // Clear the screen
+    // Clear the screen (or just the area where the asteroid was)
     draw_rect(pixel_buf, 0, 0, WIDTH, HEIGHT, 0, 0, 0);
     
+    // Move and redraw all asteroids
+    for (int i = 0; i < asteroid_count; i++) {
+        move_asteroid(pixel_buf, &asteroids[i]);
+    }
 }
-
 
 ///////////////////
 // Ignore below here, this is all example code 
 // so you can see what your code is doing.
 // Unless you want to add more game state
 ///////////////////
+
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h>
+#include <SDL3/SDL_init.h>
+#include <string_view>
 
 static int ind = 0;
 
