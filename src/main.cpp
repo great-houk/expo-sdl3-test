@@ -1,10 +1,27 @@
 #define WIDTH 272
 #define HEIGHT 144
 #define PIXEL_SIZE 5
-#define MAX_ASTEROIDS 10
+#define MAX_ASTEROIDS 8
 
 #include <cmath> // For fmod function
 #include <stdio.h> // For printf function
+#include <stdlib.h> // For rand function
+
+// Function to generate a random speed between -0.1 and +0.1 with minimum absolute value of 0.05
+float generate_random_speed() {
+    // Generate a random number between 0 and 1
+    float random_value = (float)rand() / RAND_MAX;
+    
+    // Map to range -0.1 to 0.1
+    float speed = random_value * 0.2f - 0.1f;
+    
+    // Ensure minimum absolute speed of 0.05
+    if (speed > -0.05f && speed < 0.05f) {
+        speed = (speed > 0) ? 0.05f : -0.05f;
+    }
+    
+    return speed;
+}
 
 // Example function to modify the pixel buffer
 void draw_rect(char *pixel_buf, int x, int y, int w, int h, char r, char g, char b) {
@@ -81,26 +98,23 @@ void move_asteroid(char *pixel_buf, struct Asteroid *myAsteroid) {
     // Handle wrapping around the screen horizontally
     if (myAsteroid->x > WIDTH) {
         // If the asteroid goes off the right edge, wrap to the left
-        myAsteroid->x = 0 - myAsteroid->width;
+        myAsteroid->x = 0;
     } else if (myAsteroid->x + myAsteroid->width < 0) {
         // If the asteroid goes off the left edge, wrap to the right
-        myAsteroid->x = WIDTH + myAsteroid->width;
+        myAsteroid->x = WIDTH;
     }
 
     // Handle wrapping around the screen vertically
     // Check if the asteroid is completely below the screen
     if (myAsteroid->y > HEIGHT) {
         // Wrap to the top of the screen
-        myAsteroid->y = 0 - myAsteroid->height;
+        myAsteroid->y = 0;
     } 
     // Check if the asteroid is completely above the screen
     else if (myAsteroid->y + myAsteroid->height < 0) {
         // Wrap to the bottom of the screen
-        myAsteroid->y = HEIGHT + myAsteroid->height;
+        myAsteroid->y = HEIGHT;
     }
-    
-    // Debug output to check asteroid position
-    printf("Asteroid position: x=%.2f, y=%.2f\n", myAsteroid->x, myAsteroid->y);
     
     // Convert float position to int for drawing
     int draw_x = (int)myAsteroid->x;
@@ -112,11 +126,20 @@ void move_asteroid(char *pixel_buf, struct Asteroid *myAsteroid) {
 
 // Runs once at startup
 void init(char *pixel_buf, int *ind) {
+    // Set a fixed seed for reproducibility
+    srand(42);
+    
     // Set background to black
     draw_rect(pixel_buf, 0, 0, WIDTH, HEIGHT, 0, 0, 0);
     
-    // Initialize the asteroid with a very slow speed (0.2 pixels per frame)
-    init_asteroid(pixel_buf, 100, 0, 10, 10, 0.2f, 0.05f);
+    // Initialize the asteroid with random speeds
+    for (int i = 0; i < MAX_ASTEROIDS; i++) {
+        float rand_x = (rand() % (WIDTH - 10)) + 1;
+        float rand_y = (rand() % (HEIGHT - 10)) + 1;
+        float rand_speed_x = generate_random_speed();
+        float rand_speed_y = generate_random_speed();
+        init_asteroid(pixel_buf, rand_x, rand_y, 10, 10, rand_speed_x, rand_speed_y);
+    }
     
     // Init ind
     *ind = 0;
