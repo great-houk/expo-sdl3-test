@@ -1,8 +1,54 @@
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h>
+#include <SDL3/SDL_init.h>
+#include <SDL3/SDL_keyboard.h>
+#include <SDL3/SDL_scancode.h>
+#include <SDL3/SDL_stdinc.h>  // For SDL types
+
+
 #define WIDTH 272
 #define HEIGHT 144
 #define PIXEL_SIZE 5
 #define MAX_ASTEROIDS 10
 
+// Forward declarations for struct types
+struct Asteroid;
+struct Ship;
+struct Bullet;
+
+
+struct Asteroid {
+    float x;
+    float y;
+    int width;
+    int height;
+    float speed_x;
+    float speed_y;
+};
+
+struct Ship {
+    float x;
+    float y;
+    float velocity_x;
+    float velocity_y;
+    float angle;  // in degrees
+    bool thrusting;
+};
+
+struct Bullet {
+    float x;
+    float y;
+    float velocity_x;
+    float velocity_y;
+    bool active;
+};
+
+// Array to store all asteroids
+struct Asteroid asteroids[MAX_ASTEROIDS];
+int asteroid_count = 0;
+
+// Ship instance
+struct Ship ship;
 
 // Example function to modify the pixel buffer
 void draw_rect(char *pixel_buf, int x, int y, int w, int h, char r, char g, char b) {
@@ -20,20 +66,8 @@ void draw_rect(char *pixel_buf, int x, int y, int w, int h, char r, char g, char
     }
 }
 
-struct Asteroid {
-    int x;
-    int y;
-    int width;
-    int height;
-    float speed;
-};
-
-// Array to store all asteroids
-struct Asteroid asteroids[MAX_ASTEROIDS];
-int asteroid_count = 0;
-
 // Function to initialize an asteroid
-void init_asteroid(char *pixel_buf, int x, int y, int width, int height, float speed) { 
+void init_asteroid(char *pixel_buf, float x, float y, int width, int height, float speed_x, float speed_y) { 
     // Check if we have room for another asteroid
     if (asteroid_count >= MAX_ASTEROIDS) {
         return; // No more room
@@ -44,55 +78,35 @@ void init_asteroid(char *pixel_buf, int x, int y, int width, int height, float s
     asteroids[asteroid_count].y = y;
     asteroids[asteroid_count].width = width;
     asteroids[asteroid_count].height = height;
-    asteroids[asteroid_count].speed = speed;
+    asteroids[asteroid_count].speed_x = speed_x;
+    asteroids[asteroid_count].speed_y = speed_y;    
+
+    // Convert floating-point position to integer for drawing
+    int draw_x = (int)asteroids[asteroid_count].x;
+    int draw_y = (int)asteroids[asteroid_count].y;
 
     // Create asteroid rectangle. Initialize to light blue
-    draw_rect(pixel_buf, asteroids[asteroid_count].x, asteroids[asteroid_count].y, 
+    draw_rect(pixel_buf, draw_x, draw_y, 
               asteroids[asteroid_count].width, asteroids[asteroid_count].height, 86, 107, 114);
     
     // Increment the count after adding the asteroid
     asteroid_count++;
 }
 
-void move_asteroid(char *pixel_buf, struct Asteroid *myAsteroid) {
-    // Update the asteroid's position based on its speed
-    myAsteroid->x += myAsteroid->speed;
-    
-    // Handle wrapping around the screen
-    if (myAsteroid->x > WIDTH) {
-        // If the asteroid goes off the right edge, wrap to the left
-        myAsteroid->x = -myAsteroid->width;
-    } else if (myAsteroid->x + myAsteroid->width < 0) {
-        // If the asteroid goes off the left edge, wrap to the right
-        myAsteroid->x = WIDTH;
-    }
-    
-    // Redraw the asteroid at its new position
-    draw_rect(pixel_buf, myAsteroid->x, myAsteroid->y, myAsteroid->width, myAsteroid->height, 86, 107, 114);
-}
-
 // Runs once at startup
 void init(char *pixel_buf, int *ind) {
     // Set background to black
     draw_rect(pixel_buf, 0, 0, WIDTH, HEIGHT, 0, 0, 0);
-    
-    // Initialize the asteroid with a very slow speed (0.2 pixels per frame)
-    init_asteroid(pixel_buf, 0, HEIGHT/2 - 10, 20, 20, 1.0);
-    
+    init_asteroid(pixel_buf, 100, 100, 10, 10, 1, 1);
     // Init ind
     *ind = 0;
 }
 
 void update(char *pixel_buf, int *ind) {
-    // Clear the screen (or just the area where the asteroid was)
+    // Clear the screen
     draw_rect(pixel_buf, 0, 0, WIDTH, HEIGHT, 0, 0, 0);
     
-    // Move and redraw all asteroids
-    for (int i = 0; i < asteroid_count; i++) {
-        move_asteroid(pixel_buf, &asteroids[i]);
-    }
 }
-
 
 
 ///////////////////
@@ -100,12 +114,6 @@ void update(char *pixel_buf, int *ind) {
 // so you can see what your code is doing.
 // Unless you want to add more game state
 ///////////////////
-
-#include <SDL3/SDL.h>
-#include <SDL3/SDL_main.h>
-#include <SDL3/SDL_init.h>
-#include <cmath>
-#include <string_view>
 
 static int ind = 0;
 
