@@ -1,19 +1,62 @@
 #define WIDTH 272
 #define HEIGHT 144
 #define PIXEL_SIZE 5
-#define MAX_ASTEROIDS 10
+#define MAX_ASTEROIDS 4
+#define PLAYER_SPEED 0.4f
+#define ROTATION_SPEED 18.0f
+#define THRUST_ACCELERATION 0.06f
+#define FRICTION 0.99f
+#define M_PI 3.14159265358979323846
 
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h>
+#include <SDL3/SDL_init.h>
+#include <string_view>
 #include <cmath> // For fmod function
 #include <stdio.h> // For printf function
 #include <stdlib.h> // For rand function
+
+static int ind = 0;
+
+struct AppContext {
+    SDL_Window* window;
+    SDL_Renderer* renderer;
+    SDL_Texture* texture;
+    SDL_AppResult app_quit = SDL_APP_CONTINUE;
+};
+
+// Player state
+struct Player {
+    float x;
+    float y;
+    float velocity_x;
+    float velocity_y;
+    float rotation; // in degrees
+    int lives;
+    int score;
+    bool invulnerable; // Flag to indicate invulnerability period
+    int invulnerable_timer; // Timer for invulnerability period
+};
+
+struct Player player = {
+    WIDTH / 2,  // x
+    HEIGHT / 2, // y
+    0,          // velocity_x
+    0,          // velocity_y
+    0,          // rotation
+    5,          // lives
+    0,          // score
+    false,      // invulnerable
+    0           // invulnerable_timer
+};
 
 // Function to generate a random speed of either 0.1 or -0.1
 float generate_random_speed() {
     // Generate a random number between 0 and 1
     float random_value = (float)rand() / RAND_MAX;
     
-    // Return either 0.1 or -0.1 based on the random value
-    return (random_value < 0.5f) ? 0.1f : -0.1f;
+    // Return either 0.03 or -0.03 based on the random value (much slower than before)
+    return (random_value < 0.5f) ? 0.03f : -0.03f;
 }
 
 // Example function to modify the pixel buffer
@@ -109,8 +152,6 @@ void move_asteroid(char *pixel_buf, struct Asteroid *myAsteroid) {
         myAsteroid->y = HEIGHT;
     }
     
-    // Debug output to check asteroid position
-    printf("Asteroid position: x=%.2f, y=%.2f\n", myAsteroid->x, myAsteroid->y);
     
     // Convert float position to int for drawing
     int draw_x = (int)myAsteroid->x;
@@ -120,18 +161,69 @@ void move_asteroid(char *pixel_buf, struct Asteroid *myAsteroid) {
     draw_rect(pixel_buf, draw_x, draw_y, myAsteroid->width, myAsteroid->height, 86, 107, 114);
 }
 
-// Function to draw a player (cursor-shaped)
-void draw_player(char *pixel_buf, float x, float y) {
+// Function to draw a player (ship-shaped)
+void draw_player(char *pixel_buf, float x, float y, float rotation) {
     // Convert float position to int for drawing
     int draw_x = (int)x;
     int draw_y = (int)y;
     
-    // Draw a simple cursor shape (white color - using 7-bit values 0-127)
-    // Main cursor body (vertical line)
-    draw_rect(pixel_buf, draw_x, draw_y, 2, 8, 127, 127, 127);
+    // Convert rotation to radians
+    float rad = rotation * M_PI / 180.0f;
     
-    // Cursor head (horizontal line)
-    draw_rect(pixel_buf, draw_x - 2, draw_y + 6, 6, 2, 127, 127, 127);
+    // Calculate rotated points for the ship triangle
+    // Ship is a triangle pointing up
+    int size = 8; // Size of the ship
+    int points[3][2];
+    
+    // Calculate the three points of the triangle
+    // Front point (nose)
+    points[0][0] = draw_x + (int)(size * sin(rad));
+    points[0][1] = draw_y - (int)(size * cos(rad));
+    
+    // Back left point
+    points[1][0] = draw_x + (int)(size * sin(rad + 2.61799f)); // 150 degrees
+    points[1][1] = draw_y - (int)(size * cos(rad + 2.61799f));
+    
+    // Back right point
+    points[2][0] = draw_x + (int)(size * sin(rad - 2.61799f)); // -150 degrees
+    points[2][1] = draw_y - (int)(size * cos(rad - 2.61799f));
+    
+    // Draw the ship triangle (white color)
+    for (int i = 0; i < 3; i++) {
+        int next = (i + 1) % 3;
+        // Draw line between points[i] and points[next]
+        int x0 = points[i][0];
+        int y0 = points[i][1];
+        int x1 = points[next][0];
+        int y1 = points[next][1];
+        
+        // Simple line drawing algorithm
+        int dx = abs(x1 - x0);
+        int dy = abs(y1 - y0);
+        int sx = (x0 < x1) ? 1 : -1;
+        int sy = (y0 < y1) ? 1 : -1;
+        int err = dx - dy;
+        
+        while (true) {
+            if (x0 >= 0 && x0 < WIDTH && y0 >= 0 && y0 < HEIGHT) {
+                draw_rect(pixel_buf, x0, y0, 1, 1, 127, 127, 127);
+            }
+            
+            if (x0 == x1 && y0 == y1) break;
+            int e2 = 2 * err;
+            if (e2 > -dy) { err -= dy; x0 += sx; }
+            if (e2 < dx) { err += dx; y0 += sy; }
+        }
+    }
+}
+
+// Function to draw text
+void draw_text(char *pixel_buf, const char* text, int x, int y, char r, char g, char b) {
+    int len = strlen(text);
+    for (int i = 0; i < len; i++) {
+        // Draw each character as a simple rectangle
+        draw_rect(pixel_buf, x + i * 6, y, 5, 8, r, g, b);
+    }
 }
 
 // Runs once at startup
@@ -152,23 +244,98 @@ void init(char *pixel_buf, int *ind) {
     }
     
     // Draw the player at the center of the screen
-    draw_player(pixel_buf, WIDTH / 2, HEIGHT / 2);
+    draw_player(pixel_buf, WIDTH / 2, HEIGHT / 2, 0);
     
     // Init ind
     *ind = 0;
 }
 
-void update(char *pixel_buf, int *ind) {
-    // Clear the screen (or just the area where the asteroid was)
+void update(char *pixel_buf, int *ind, struct AppContext* app) {
+    // Clear the screen
     draw_rect(pixel_buf, 0, 0, WIDTH, HEIGHT, 0, 0, 0);
+    
+    // Update player position
+    player.x += player.velocity_x;
+    player.y += player.velocity_y;
+    
+    // Apply friction
+    player.velocity_x *= FRICTION;
+    player.velocity_y *= FRICTION;
+    
+    // Handle player wrapping around the screen
+    if (player.x > WIDTH) {
+        player.x = 0;
+    } else if (player.x < 0) {
+        player.x = WIDTH;
+    }
+    
+    if (player.y > HEIGHT) {
+        player.y = 0;
+    } else if (player.y < 0) {
+        player.y = HEIGHT;
+    }
+    
+    // Update invulnerability timer
+    if (player.invulnerable) {
+        player.invulnerable_timer--;
+        if (player.invulnerable_timer <= 0) {
+            player.invulnerable = false;
+        }
+    }
     
     // Move and redraw all asteroids
     for (int i = 0; i < asteroid_count; i++) {
         move_asteroid(pixel_buf, &asteroids[i]);
+        
+        // Check for collision with player
+        if (!player.invulnerable) {
+            float dx = player.x - asteroids[i].x;
+            float dy = player.y - asteroids[i].y;
+            float distance = sqrt(dx * dx + dy * dy);
+            if (distance < 10) { // Simple collision detection
+                player.lives--;
+                printf("Collision! Lives remaining: %d\n", player.lives);
+                
+                // Set invulnerability period (180 frames = ~3 seconds at 60 FPS)
+                player.invulnerable = true;
+                player.invulnerable_timer = 180;
+                
+                if (player.lives <= 0) {
+                    // Game over - exit program
+                    app->app_quit = SDL_APP_SUCCESS;
+                    return;
+                }
+                // No position reset at all - player stays where they are
+                // No asteroid reset at all - asteroids stay where they are
+                
+                // Break out of the loop to prevent multiple collisions in the same frame
+                break;
+            }
+        }
     }
     
-    // Redraw the player at the center of the screen
-    draw_player(pixel_buf, WIDTH / 2, HEIGHT / 2);
+    // Draw the player
+    // Flash the player when invulnerable
+    if (!player.invulnerable || (player.invulnerable_timer / 5) % 2 == 0) {
+        draw_player(pixel_buf, player.x, player.y, player.rotation);
+    }
+    
+    // Draw score
+    char score_text[32];
+    sprintf(score_text, "Score: %d", player.score);
+    
+    // Draw score in top-left corner
+    draw_text(pixel_buf, score_text, 0, 0, 127, 127, 127);
+    
+    // Draw lives as rectangles in top-right corner
+    const int life_rect_size = 8;
+    const int life_rect_spacing = 2;
+    const int life_rect_y = 5;
+    
+    for (int i = 0; i < player.lives; i++) {
+        int life_rect_x = WIDTH - (i + 1) * (life_rect_size + life_rect_spacing);
+        draw_rect(pixel_buf, life_rect_x, life_rect_y, life_rect_size, life_rect_size, 127, 127, 127);
+    }
 }
 
 ///////////////////
@@ -177,20 +344,6 @@ void update(char *pixel_buf, int *ind) {
 // Unless you want to add more game state
 ///////////////////
 
-#include <SDL3/SDL.h>
-#include <SDL3/SDL_main.h>
-#include <SDL3/SDL_init.h>
-#include <string_view>
-
-static int ind = 0;
-
-struct AppContext {
-    SDL_Window* window;
-    SDL_Renderer* renderer;
-    SDL_Texture* texture;
-    SDL_AppResult app_quit = SDL_APP_CONTINUE;
-};
-
 SDL_AppResult SDL_Fail(){
     SDL_LogError(SDL_LOG_CATEGORY_CUSTOM, "Error %s", SDL_GetError());
     return SDL_APP_FAILURE;
@@ -198,19 +351,19 @@ SDL_AppResult SDL_Fail(){
 
 SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     // init the library, here we make a window so we only need the Video capabilities.
-    if (not SDL_Init(SDL_INIT_VIDEO)){
+    if (!SDL_Init(SDL_INIT_VIDEO)){
         return SDL_Fail();
     }
     
     // create a window
     SDL_Window* window = SDL_CreateWindow("SDL Minimal Sample", WIDTH * PIXEL_SIZE, HEIGHT * PIXEL_SIZE, 0);
-    if (not window){
+    if (!window){
         return SDL_Fail();
     }
     
     // create a renderer
     SDL_Renderer* renderer = SDL_CreateRenderer(window, NULL);
-    if (not renderer){
+    if (!renderer){
         return SDL_Fail();
     }
 
@@ -232,11 +385,11 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     }
 
     // set up the application data
-    *appstate = new AppContext{
-       .window = window,
-       .renderer = renderer,
-       .texture = texture,
-    };
+    AppContext* context = new AppContext();
+    context->window = window;
+    context->renderer = renderer;
+    context->texture = texture;
+    *appstate = context;
 
     // Call init
     char* pixel_buf;
@@ -258,6 +411,30 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event* event) {
     if (event->type == SDL_EVENT_QUIT) {
         app->app_quit = SDL_APP_SUCCESS;
     }
+    
+    if (event->type == SDL_EVENT_KEY_DOWN || event->type == SDL_EVENT_KEY_UP) {
+        float rad = player.rotation * M_PI / 180.0f;
+        
+        switch (event->key.scancode) {
+            case SDL_SCANCODE_LEFT:
+                if (event->type == SDL_EVENT_KEY_DOWN) {
+                    player.rotation -= ROTATION_SPEED;
+                }
+                break;
+            case SDL_SCANCODE_RIGHT:
+                if (event->type == SDL_EVENT_KEY_DOWN) {
+                    player.rotation += ROTATION_SPEED;
+                }
+                break;
+            case SDL_SCANCODE_SPACE:
+                if (event->type == SDL_EVENT_KEY_DOWN) {
+                    // Apply thrust in the direction the ship is facing
+                    player.velocity_x += sin(rad) * THRUST_ACCELERATION;
+                    player.velocity_y -= cos(rad) * THRUST_ACCELERATION;
+                }
+                break;
+        }
+    }
 
     return SDL_APP_CONTINUE;
 }
@@ -277,7 +454,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     char* pixel_buf;
     int temp;
     SDL_LockTexture(app->texture, NULL, (void**)&pixel_buf, &temp);
-    update((char *)pixel_buf, &ind);
+    update((char *)pixel_buf, &ind, app);
     SDL_UnlockTexture(app->texture);
 
     // Renderer uses the painter's algorithm to make the text appear above the image, we must render the image first.
