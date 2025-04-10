@@ -161,9 +161,9 @@ void update_bullets(char *pixel_buf) {
         }
         
         if (bullets[i].y > HEIGHT) {
-            bullets[i].y = 0;
-        } else if (bullets[i].y < 0) {
             bullets[i].y = HEIGHT;
+        } else if (bullets[i].y < 0) {
+            bullets[i].y = 0;
         }
         
         // Draw the bullet (yellow)
@@ -277,20 +277,20 @@ void move_asteroid(char *pixel_buf, struct Asteroid *myAsteroid) {
         // If the asteroid goes off the right edge, wrap to the left
         myAsteroid->x = 0;
     } else if (myAsteroid->x + myAsteroid->width < 0) {
-        // If the asteroid goes off the left edge, wrap to the right
+        // If the asteroid goes off the left edge, wrap to the right   
         myAsteroid->x = WIDTH;
     }
 
-    // Handle wrapping around the screen vertically
+    // Handle wrapping around the screen vertically   
     // Check if the asteroid is completely below the screen
     if (myAsteroid->y > HEIGHT) {
         // Wrap to the top of the screen
-        myAsteroid->y = 0;
+        myAsteroid->y = HEIGHT;
     } 
     // Check if the asteroid is completely above the screen
     else if (myAsteroid->y + myAsteroid->height < 0) {
         // Wrap to the bottom of the screen
-        myAsteroid->y = HEIGHT;
+        myAsteroid->y = 0;
     }
     
     
