@@ -15,6 +15,7 @@
 #include <cmath> // For fmod function
 #include <stdio.h> // For printf function
 #include <stdlib.h> // For rand function
+#include <vector> // For dynamic bullet storage
 
 static int ind = 0;
 
@@ -99,6 +100,146 @@ struct Asteroid {
 // Array to store all asteroids
 struct Asteroid asteroids[MAX_ASTEROIDS];
 int asteroid_count = 0;
+
+// Bullet structure
+struct Bullet {
+    float x;
+    float y;
+    float velocity_x;
+    float velocity_y;
+    bool active;
+    int lifetime; // Timer for how long the bullet exists
+};
+
+// Vector to store bullets (dynamic, no maximum limit)
+std::vector<Bullet> bullets;
+
+// Function to create a bullet
+void create_bullet(float x, float y, float rotation) {
+    // Convert rotation to radians
+    float rad = rotation * M_PI / 180.0f;
+    
+    // Calculate bullet velocity (faster than player)
+    float bullet_speed = 0.5f;
+    
+    // Create a new bullet
+    Bullet new_bullet;
+    new_bullet.x = x;
+    new_bullet.y = y;
+    new_bullet.velocity_x = sin(rad) * bullet_speed;
+    new_bullet.velocity_y = -cos(rad) * bullet_speed;
+    new_bullet.active = true;
+    new_bullet.lifetime = 180; // Bullet will disappear after 180 frames (about 3 seconds at 60 FPS)
+    
+    // Add the bullet to the vector
+    bullets.push_back(new_bullet);
+}
+
+// Function to update and draw bullets
+void update_bullets(char *pixel_buf) {
+    for (size_t i = 0; i < bullets.size(); i++) {
+        if (!bullets[i].active) continue;
+        
+        // Update bullet position
+        bullets[i].x += bullets[i].velocity_x;
+        bullets[i].y += bullets[i].velocity_y;
+        
+        // Decrease lifetime
+        bullets[i].lifetime--;
+        
+        // Check if bullet has expired
+        if (bullets[i].lifetime <= 0) {
+            bullets[i].active = false;
+            continue;
+        }
+        
+        // Handle wrapping around the screen
+        if (bullets[i].x > WIDTH) {
+            bullets[i].x = 0;
+        } else if (bullets[i].x < 0) {
+            bullets[i].x = WIDTH;
+        }
+        
+        if (bullets[i].y > HEIGHT) {
+            bullets[i].y = 0;
+        } else if (bullets[i].y < 0) {
+            bullets[i].y = HEIGHT;
+        }
+        
+        // Draw the bullet (yellow)
+        int draw_x = (int)bullets[i].x;
+        int draw_y = (int)bullets[i].y;
+        draw_rect(pixel_buf, draw_x, draw_y, 2, 2, 255, 255, 0);
+    }
+}
+
+// Function to check for bullet-asteroid collisions
+void check_bullet_collisions(char *pixel_buf) {
+    for (size_t i = 0; i < bullets.size(); i++) {
+        if (!bullets[i].active) continue;
+        
+        for (int j = 0; j < asteroid_count; j++) {
+            // Simple collision detection
+            float dx = bullets[i].x - asteroids[j].x;
+            float dy = bullets[i].y - asteroids[j].y;
+            float distance = sqrt(dx * dx + dy * dy);
+            
+            if (distance < 10) { // Collision detected
+                // Deactivate the bullet
+                bullets[i].active = false;
+                
+                // Increment score
+                player.score += 10;
+                
+                // Respawn the asteroid in a new position far from the player
+                float new_x, new_y;
+                bool valid_position = false;
+                
+                // Try to find a position that's far from the player
+                for (int attempts = 0; attempts < 10; attempts++) {
+                    new_x = (rand() % (WIDTH - 10)) + 1;
+                    new_y = (rand() % (HEIGHT - 10)) + 1;
+                    
+                    // Check distance from player
+                    float player_dx = new_x - player.x;
+                    float player_dy = new_y - player.y;
+                    float player_distance = sqrt(player_dx * player_dx + player_dy * player_dy);
+                    
+                    // If the new position is far enough from the player, use it
+                    if (player_distance > 50) {
+                        valid_position = true;
+                        break;
+                    }
+                }
+                
+                // If we couldn't find a valid position, just use a random one
+                if (!valid_position) {
+                    new_x = (rand() % (WIDTH - 10)) + 1;
+                    new_y = (rand() % (HEIGHT - 10)) + 1;
+                }
+                
+                // Update asteroid position and speed
+                asteroids[j].x = new_x;
+                asteroids[j].y = new_y;
+                asteroids[j].speed_x = generate_random_speed();
+                asteroids[j].speed_y = generate_random_speed();
+                
+                // Break out of the inner loop since this bullet is now inactive
+                break;
+            }
+        }
+    }
+    
+    // Clean up inactive bullets to prevent memory growth
+    // This is optional but recommended for long gameplay sessions
+    if (bullets.size() > 1000) { // Only clean up if we have a lot of bullets
+        bullets.erase(
+            std::remove_if(bullets.begin(), bullets.end(), 
+                [](const Bullet& b) { return !b.active; }),
+            bullets.end()
+        );
+    }
+}
 
 // Function to initialize an asteroid
 void init_asteroid(char *pixel_buf, float x, float y, int width, int height, float speed_x, float speed_y) {
@@ -314,6 +455,12 @@ void update(char *pixel_buf, int *ind, struct AppContext* app) {
         }
     }
     
+    // Update and draw bullets
+    update_bullets(pixel_buf);
+    
+    // Check for bullet-asteroid collisions
+    check_bullet_collisions(pixel_buf);
+    
     // Draw the player
     // Flash the player when invulnerable
     if (!player.invulnerable || (player.invulnerable_timer / 5) % 2 == 0) {
@@ -431,6 +578,17 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event* event) {
                     // Apply thrust in the direction the ship is facing
                     player.velocity_x += sin(rad) * THRUST_ACCELERATION;
                     player.velocity_y -= cos(rad) * THRUST_ACCELERATION;
+                }
+                break;
+            case SDL_SCANCODE_UP:
+                if (event->type == SDL_EVENT_KEY_DOWN) {
+                    // Calculate the position at the front of the ship
+                    float ship_size = 8.0f; // Same as in draw_player
+                    float bullet_x = player.x + sin(rad) * ship_size;
+                    float bullet_y = player.y - cos(rad) * ship_size;
+                    
+                    // Create a bullet at the front of the ship
+                    create_bullet(bullet_x, bullet_y, player.rotation);
                 }
                 break;
         }
