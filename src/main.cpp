@@ -133,7 +133,7 @@ void create_bullet(float x, float y, float rotation) {
     bullets[bullet_count].velocity_x = sin(rad) * bullet_speed;
     bullets[bullet_count].velocity_y = -cos(rad) * bullet_speed;
     bullets[bullet_count].active = true;
-    bullets[bullet_count].lifetime = 180; // Bullet will disappear after 180 frames (about 3 seconds at 60 FPS)
+    bullets[bullet_count].lifetime = 240; // Bullet will disappear after 240 frames (about 4 seconds at 60 FPS)
     
     // Increment the bullet count
     bullet_count++;
@@ -196,6 +196,7 @@ void check_bullet_collisions(char *pixel_buf) {
                 
                 // Increment score
                 player.score += 10;
+                printf("Score: %d\n", player.score);
                 
                 // Respawn the asteroid in a new position far from the player
                 float new_x, new_y;
@@ -442,7 +443,7 @@ void update(char *pixel_buf, int *ind, struct AppContext* app) {
                 
                 // Set invulnerability period (180 frames = ~3 seconds at 60 FPS)
                 player.invulnerable = true;
-                player.invulnerable_timer = 180;
+                player.invulnerable_timer = 1000;
                 
                 if (player.lives <= 0) {
                     // Game over - exit program
