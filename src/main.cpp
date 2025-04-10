@@ -166,8 +166,10 @@ void update_bullets(char *pixel_buf) {
         
         if (bullets[i].y > HEIGHT) {
             bullets[i].y = 0;
+            bullets[i].lifetime = 0;
         } else if (bullets[i].y < 0) {
             bullets[i].y = HEIGHT;
+            bullets[i].lifetime = 0;
         }
         
         // Draw the bullet (yellow)
