@@ -7,6 +7,7 @@
 #define THRUST_ACCELERATION 0.06f
 #define FRICTION 0.99f
 #define M_PI 3.14159265358979323846
+#define MAX_BULLETS 1000
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
@@ -15,7 +16,6 @@
 #include <cmath> // For fmod function
 #include <stdio.h> // For printf function
 #include <stdlib.h> // For rand function
-#include <vector> // For dynamic bullet storage
 
 static int ind = 0;
 
@@ -111,33 +111,37 @@ struct Bullet {
     int lifetime; // Timer for how long the bullet exists
 };
 
-// Vector to store bullets (dynamic, no maximum limit)
-std::vector<Bullet> bullets;
+struct Bullet bullets[MAX_BULLETS];
+int bullet_count = 0;
 
 // Function to create a bullet
 void create_bullet(float x, float y, float rotation) {
+    // Check if we have room for another bullet
+    if (bullet_count >= MAX_BULLETS) {
+        return; // No more room
+    }
+    
     // Convert rotation to radians
     float rad = rotation * M_PI / 180.0f;
     
     // Calculate bullet velocity (faster than player)
     float bullet_speed = 0.5f;
     
-    // Create a new bullet
-    Bullet new_bullet;
-    new_bullet.x = x;
-    new_bullet.y = y;
-    new_bullet.velocity_x = sin(rad) * bullet_speed;
-    new_bullet.velocity_y = -cos(rad) * bullet_speed;
-    new_bullet.active = true;
-    new_bullet.lifetime = 180; // Bullet will disappear after 180 frames (about 3 seconds at 60 FPS)
+    // Initialize the bullet
+    bullets[bullet_count].x = x;
+    bullets[bullet_count].y = y;
+    bullets[bullet_count].velocity_x = sin(rad) * bullet_speed;
+    bullets[bullet_count].velocity_y = -cos(rad) * bullet_speed;
+    bullets[bullet_count].active = true;
+    bullets[bullet_count].lifetime = 180; // Bullet will disappear after 180 frames (about 3 seconds at 60 FPS)
     
-    // Add the bullet to the vector
-    bullets.push_back(new_bullet);
+    // Increment the bullet count
+    bullet_count++;
 }
 
 // Function to update and draw bullets
 void update_bullets(char *pixel_buf) {
-    for (size_t i = 0; i < bullets.size(); i++) {
+    for (int i = 0; i < bullet_count; i++) {
         if (!bullets[i].active) continue;
         
         // Update bullet position
@@ -161,9 +165,9 @@ void update_bullets(char *pixel_buf) {
         }
         
         if (bullets[i].y > HEIGHT) {
-            bullets[i].y = HEIGHT;
-        } else if (bullets[i].y < 0) {
             bullets[i].y = 0;
+        } else if (bullets[i].y < 0) {
+            bullets[i].y = HEIGHT;
         }
         
         // Draw the bullet (yellow)
@@ -175,7 +179,7 @@ void update_bullets(char *pixel_buf) {
 
 // Function to check for bullet-asteroid collisions
 void check_bullet_collisions(char *pixel_buf) {
-    for (size_t i = 0; i < bullets.size(); i++) {
+    for (int i = 0; i < bullet_count; i++) {
         if (!bullets[i].active) continue;
         
         for (int j = 0; j < asteroid_count; j++) {
@@ -229,16 +233,6 @@ void check_bullet_collisions(char *pixel_buf) {
             }
         }
     }
-    
-    // Clean up inactive bullets to prevent memory growth
-    // This is optional but recommended for long gameplay sessions
-    if (bullets.size() > 1000) { // Only clean up if we have a lot of bullets
-        bullets.erase(
-            std::remove_if(bullets.begin(), bullets.end(), 
-                [](const Bullet& b) { return !b.active; }),
-            bullets.end()
-        );
-    }
 }
 
 // Function to initialize an asteroid
@@ -283,14 +277,14 @@ void move_asteroid(char *pixel_buf, struct Asteroid *myAsteroid) {
 
     // Handle wrapping around the screen vertically   
     // Check if the asteroid is completely below the screen
-    if (myAsteroid->y > HEIGHT) {
+    if (myAsteroid->y + myAsteroid->height > HEIGHT) {
         // Wrap to the top of the screen
-        myAsteroid->y = HEIGHT;
+        myAsteroid->speed_y = -myAsteroid->speed_y;
     } 
     // Check if the asteroid is completely above the screen
-    else if (myAsteroid->y + myAsteroid->height < 0) {
+    else if (myAsteroid->y < 0) {
         // Wrap to the bottom of the screen
-        myAsteroid->y = 0;
+        myAsteroid->speed_y = -myAsteroid->speed_y;
     }
     
     
@@ -403,17 +397,24 @@ void update(char *pixel_buf, int *ind, struct AppContext* app) {
     player.velocity_x *= FRICTION;
     player.velocity_y *= FRICTION;
     
-    // Handle player wrapping around the screen
+    // Handle player wrapping around the screen horizontally
     if (player.x > WIDTH) {
         player.x = 0;
     } else if (player.x < 0) {
         player.x = WIDTH;
     }
     
-    if (player.y > HEIGHT) {
-        player.y = 0;
-    } else if (player.y < 0) {
-        player.y = HEIGHT;
+    // Prevent player from going off the screen vertically
+    // Add a small margin to account for the player's size
+    const int player_margin = 10;
+    if (player.y > HEIGHT - player_margin) {
+        player.y = HEIGHT - player_margin;
+        // Bounce off the bottom by reversing vertical velocity
+        player.velocity_y = -player.velocity_y * 0.5f;
+    } else if (player.y < player_margin) {
+        player.y = player_margin;
+        // Bounce off the top by reversing vertical velocity
+        player.velocity_y = -player.velocity_y * 0.5f;
     }
     
     // Update invulnerability timer
