@@ -78,13 +78,11 @@ struct Player player = {
     0           // invulnerable_timer
 };
 
-// Function to generate a random speed of either 0.1 or -0.1
+// Function to generate a random speed within a range
 float generate_random_speed() {
-    // Generate a random number between 0 and 1
-    float random_value = random_float();
-    
-    // Return either 0.03 or -0.03 based on the random value (much slower than before)
-    return (random_value < 0.5f) ? 0.03f : -0.03f;
+    // Generate a random float between -0.05 and 0.05
+    // This will give more varied movement patterns
+    return (random_float() * 0.1f) - 0.05f;
 }
 
 // Example function to modify the pixel buffer
@@ -394,7 +392,7 @@ void draw_text(char *pixel_buf, const char* text, int x, int y, char r, char g, 
 // Runs once at startup
 void init(char *pixel_buf, int *ind) {
     // Set a fixed seed for reproducibility
-    init_random(42);
+    init_random(54321);
     
     // Set background to black
     draw_rect(pixel_buf, 0, 0, WIDTH, HEIGHT, 0, 0, 0);
