@@ -2,10 +2,10 @@
 #define HEIGHT 144
 #define PIXEL_SIZE 5
 #define MAX_ASTEROIDS 4
-#define PLAYER_SPEED 0.4f
+#define PLAYER_SPEED 0.25f
 #define ROTATION_SPEED 18.0f
-#define THRUST_ACCELERATION 0.06f
-#define FRICTION 0.99f
+#define THRUST_ACCELERATION 0.03f
+#define FRICTION 0.995f
 #define M_PI 3.14159265358979323846
 #define MAX_BULLETS 1000
 
@@ -81,9 +81,19 @@ float random_float() {
 
 // Function to generate a random speed within a range
 float generate_random_speed() {
-    // Generate a random float between -0.05 and 0.05
-    // This will give more varied movement patterns
-    return (random_float() * 0.1f) - 0.05f;
+    // Generate a random float between -0.03 and 0.03
+    // This ensures asteroids can travel in different directions
+    // with a minimum absolute speed of 0.01
+    float speed = (random_float() * 0.06f) - 0.03f;
+    
+    // Ensure minimum speed in either direction
+    if (speed > 0 && speed < 0.01f) {
+        speed = 0.01f;
+    } else if (speed < 0 && speed > -0.01f) {
+        speed = -0.01f;
+    }
+    
+    return speed;
 }
 
 // Example function to modify the pixel buffer
@@ -98,7 +108,6 @@ void draw_rect(char *pixel_buf, int x, int y, int w, int h, char r, char g, char
     int start_y = (y < 0) ? 0 : y;
     int end_x = (x + w > WIDTH) ? WIDTH : x + w;
     int end_y = (y + h > HEIGHT) ? HEIGHT : y + h;
-    
     // Draw only the visible portion
     for (int i = start_x; i < end_x; i++) {
         for (int j = start_y; j < end_y; j++) {
@@ -151,7 +160,7 @@ void create_bullet(float x, float y, float rotation) {
     float rad = rotation * M_PI / 180.0f;
     
     // Calculate bullet velocity (faster than player)
-    float bullet_speed = 0.5f;
+    float bullet_speed = 0.3f;
     
     // Initialize the bullet
     bullets[bullet_count].x = x;
@@ -381,6 +390,137 @@ void draw_player(char *pixel_buf, float x, float y, float rotation) {
     }
 }
 
+// Function to draw a simple character using rectangles
+void draw_char(char *pixel_buf, int x, int y, char c, char r, char g, char b) {
+    // Simple 5x7 pixel font for ASCII characters
+    // This is a very basic implementation that only handles a few characters
+    // For a full implementation, you would need a complete font bitmap
+    
+    switch (c) {
+        case '0':
+            draw_rect(pixel_buf, x, y, 5, 1, r, g, b);
+            draw_rect(pixel_buf, x, y, 1, 7, r, g, b);
+            draw_rect(pixel_buf, x+4, y, 1, 7, r, g, b);
+            draw_rect(pixel_buf, x, y+6, 5, 1, r, g, b);
+            break;
+        case '1':
+            draw_rect(pixel_buf, x+2, y, 1, 7, r, g, b);
+            // draw_rect(pixel_buf, x+1, y+1, 3, 1, r, g, b);
+            break;
+        case '2':
+            draw_rect(pixel_buf, x, y, 5, 1, r, g, b);      // Top horizontal
+            draw_rect(pixel_buf, x+4, y+1, 1, 2, r, g, b);  // Right vertical at top
+            draw_rect(pixel_buf, x, y+3, 5, 1, r, g, b);    // Middle horizontal
+            draw_rect(pixel_buf, x, y+4, 1, 2, r, g, b);    // Left vertical at bottom
+            draw_rect(pixel_buf, x, y+6, 5, 1, r, g, b);    // Bottom horizontal
+            break;
+        case '3':
+            draw_rect(pixel_buf, x, y, 5, 1, r, g, b);
+            draw_rect(pixel_buf, x+4, y+1, 1, 5, r, g, b);
+            draw_rect(pixel_buf, x, y+6, 5, 1, r, g, b);
+            draw_rect(pixel_buf, x, y+3, 5, 1, r, g, b);
+            break;
+        case '4':
+            draw_rect(pixel_buf, x, y, 1, 4, r, g, b);      // Left vertical line (top portion)
+            draw_rect(pixel_buf, x+4, y, 1, 7, r, g, b);    // Right vertical line (full height)
+            draw_rect(pixel_buf, x, y+3, 5, 1, r, g, b);    // Middle horizontal line
+            break;
+        case '5':
+            draw_rect(pixel_buf, x, y, 5, 1, r, g, b);
+            draw_rect(pixel_buf, x, y+1, 1, 2, r, g, b);
+            draw_rect(pixel_buf, x, y+3, 5, 1, r, g, b);
+            draw_rect(pixel_buf, x+4, y+4, 1, 2, r, g, b);
+            draw_rect(pixel_buf, x, y+6, 5, 1, r, g, b);
+            break;
+        case '6':
+            draw_rect(pixel_buf, x, y, 5, 1, r, g, b);
+            draw_rect(pixel_buf, x, y+1, 1, 5, r, g, b);
+            draw_rect(pixel_buf, x, y+3, 5, 1, r, g, b);
+            draw_rect(pixel_buf, x+4, y+4, 1, 2, r, g, b);
+            draw_rect(pixel_buf, x, y+6, 5, 1, r, g, b);
+            break;
+        case '7':
+            draw_rect(pixel_buf, x, y, 5, 1, r, g, b);
+            draw_rect(pixel_buf, x+4, y+1, 1, 5, r, g, b);
+            break;
+        case '8':
+            draw_rect(pixel_buf, x, y, 5, 1, r, g, b);
+            draw_rect(pixel_buf, x, y+1, 1, 5, r, g, b);
+            draw_rect(pixel_buf, x+4, y+1, 1, 5, r, g, b);
+            draw_rect(pixel_buf, x, y+3, 5, 1, r, g, b);
+            draw_rect(pixel_buf, x, y+6, 5, 1, r, g, b);
+            break;
+        case '9':
+            draw_rect(pixel_buf, x, y, 5, 1, r, g, b);
+            draw_rect(pixel_buf, x, y+1, 1, 2, r, g, b);
+            draw_rect(pixel_buf, x+4, y+1, 1, 5, r, g, b);
+            draw_rect(pixel_buf, x, y+3, 5, 1, r, g, b);
+            draw_rect(pixel_buf, x, y+6, 5, 1, r, g, b);
+            break;
+    case 'S':
+        draw_rect(pixel_buf, x, y, 5, 1, r, g, b);      // Top horizontal
+        draw_rect(pixel_buf, x, y+1, 1, 2, r, g, b);    // Left vertical (top portion)
+        draw_rect(pixel_buf, x, y+3, 5, 1, r, g, b);    // Middle horizontal
+        draw_rect(pixel_buf, x+4, y+4, 1, 2, r, g, b);  // Right vertical (bottom portion)
+        draw_rect(pixel_buf, x, y+6, 5, 1, r, g, b);    // Bottom horizontal
+        break;
+
+    case 'c':
+        // Current implementation shows a full box, but lowercase 'c' should be open on the right top
+        draw_rect(pixel_buf, x+1, y, 4, 1, r, g, b);    // Top horizontal (slightly indented)
+        draw_rect(pixel_buf, x, y+1, 1, 5, r, g, b);    // Left vertical
+        draw_rect(pixel_buf, x+1, y+6, 4, 1, r, g, b);  // Bottom horizontal
+        draw_rect(pixel_buf, x+4, y+1, 1, 1, r, g, b);  // Small top-right mark
+        draw_rect(pixel_buf, x+4, y+5, 1, 1, r, g, b);  // Small bottom-right mark
+        break;
+
+    case 'o':
+        // 'o' should be a complete oval/rectangle without openings
+        draw_rect(pixel_buf, x+1, y, 3, 1, r, g, b);    // Top horizontal
+        draw_rect(pixel_buf, x, y+1, 1, 5, r, g, b);    // Left vertical
+        draw_rect(pixel_buf, x+1, y+6, 3, 1, r, g, b);  // Bottom horizontal
+        draw_rect(pixel_buf, x+4, y+1, 1, 5, r, g, b);  // Right vertical
+        break;
+
+    case 'r':
+        // 'r' should have a stem and a hook at the top right
+        draw_rect(pixel_buf, x, y, 1, 7, r, g, b);      // Left vertical (full height)
+        draw_rect(pixel_buf, x+1, y, 3, 1, r, g, b);    // Top horizontal
+        draw_rect(pixel_buf, x+4, y+1, 1, 2, r, g, b);  // Right vertical (small hook)
+        break;
+
+        case 'e':
+        // 'e' has issues with vertical positions for right segments
+        draw_rect(pixel_buf, x+1, y, 3, 1, r, g, b);    // Top horizontal
+        draw_rect(pixel_buf, x, y+1, 1, 5, r, g, b);    // Left vertical
+        draw_rect(pixel_buf, x+1, y+3, 3, 1, r, g, b);  // Middle horizontal
+        draw_rect(pixel_buf, x+1, y+6, 3, 1, r, g, b);  // Bottom horizontal
+        draw_rect(pixel_buf, x+4, y+1, 1, 2, r, g, b);  // Right vertical (top portion)
+        draw_rect(pixel_buf, x+4, y+4, 1, 2, r, g, b);  // Right vertical (bottom portion)
+        break;
+
+
+
+        case ':':
+            draw_rect(pixel_buf, x+2, y+2, 1, 1, r, g, b);
+            draw_rect(pixel_buf, x+2, y+4, 1, 1, r, g, b);
+            break;
+        case ' ':
+            // Space character - do nothing
+            break;
+    }
+}
+
+// Function to draw a string using the pixel buffer
+void draw_text(char *pixel_buf, int x, int y, const char *text, char r, char g, char b) {
+    int char_width = 6; // Width of each character including spacing
+    int pos_x = x;
+    
+    for (int i = 0; text[i] != '\0'; i++) {
+        draw_char(pixel_buf, pos_x, y, text[i], r, g, b);
+        pos_x += char_width;
+    }
+}
 
 // Runs once at startup
 void init(char *pixel_buf, int *ind) {
@@ -459,7 +599,7 @@ void update(char *pixel_buf, int *ind, struct AppContext* app) {
                 player.lives--;
                 printf("Collision! Lives remaining: %d\n", player.lives);
                 
-                // Set invulnerability period (180 frames = ~3 seconds at 60 FPS)
+                // Set invulnerability period (1000 frames)
                 player.invulnerable = true;
                 player.invulnerable_timer = 1000;
                 
@@ -504,6 +644,9 @@ void update(char *pixel_buf, int *ind, struct AppContext* app) {
         int life_rect_x = WIDTH - (i + 1) * (life_rect_size + life_rect_spacing);
         draw_rect(pixel_buf, life_rect_x, life_rect_y, life_rect_size, life_rect_size, 127, 127, 127);
     }
+    
+    // Draw score text in top-left corner using our custom text drawing function
+    draw_text(pixel_buf, 10, 10, score_text, 255, 255, 255);
 }
 
 ///////////////////
