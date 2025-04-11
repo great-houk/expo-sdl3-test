@@ -51,6 +51,19 @@ struct Player player = {
     0           // invulnerable_timer
 };
 
+
+struct EVENTS {
+
+    bool left_flag;
+    bool right_flag;
+
+    bool shoot_flag;
+    bool thrust_flag;
+
+};
+
+
+
 // Custom random number generator using Linear Congruential Generator (LCG)
 // These constants are from Numerical Recipes
 static unsigned long next = 1;
@@ -546,9 +559,66 @@ void init(char *pixel_buf, int *ind) {
     *ind = 0;
 }
 
+EVENTS control_handler(EVENTS *key_events) {
+    char buffer[CONTROLLER_MESSAGE_LENGTH + 1]; // +1 for null
+
+    for (int i = 0; i < CONTROLLER_MESSAGE_LENGTH; ++i) {
+        buffer[i] = (char)multicore_fifo_push_blocking();
+    }
+
+    int x = ((int)buffer[0])100 + ((int)buffer[1])10 + (int)buffer[2];
+    int y = ((int)buffer[3])100 + ((int)buffer[4])*10 + (int)buffer[5];
+    bool shoot_button = (buffer[6] == '1');
+    bool thrust_button = (buffer[7] == '1');
+
+
+   if(x > 20) {
+        key_events->right_flag = true;
+    } else if (x < -20) {
+        key_events->left_flag = true;
+    } else {
+        key_events->right_flag = false;
+        key_events->left_flag = false;
+    }
+
+
+    key_events->shoot_flag = shoot_button;
+    key_events->thrust_flag = thrust_button;
+}
+
+void handle_events(EVENTS *key_events) {
+
+    float rad = player.rotation * M_PI / 180.0f;
+        
+    if (key_events->left_flag) {
+        player.rotation -= ROTATION_SPEED;
+    }
+    if (key_events->right_flag) {
+        player.rotation += ROTATION_SPEED;
+    }
+    if (key_events->thrust_flag) {
+        // Apply thrust in the direction the ship is facing
+        player.velocity_x += sin(rad) * THRUST_ACCELERATION;
+        player.velocity_y -= cos(rad) * THRUST_ACCELERATION;
+    }
+    if (key_events->shoot_flag) {
+        // Calculate the position at the front of the ship
+        float ship_size = 8.0f; // Same as in draw_player
+        float bullet_x = player.x + sin(rad) * ship_size;
+        float bullet_y = player.y - cos(rad) * ship_size;
+        
+        // Create a bullet at the front of the ship
+        create_bullet(bullet_x, bullet_y, player.rotation);
+    }
+}
+
 void update(char *pixel_buf, int *ind, struct AppContext* app) {
     // Clear the screen
     draw_rect(pixel_buf, 0, 0, WIDTH, HEIGHT, 0, 0, 0);
+
+    struct EVENTS key_events;
+    EVENTS events = control_handler(&key_events);
+    handle_events(&key_events);
     
     // Update player position
     player.x += player.velocity_x;
@@ -646,8 +716,9 @@ void update(char *pixel_buf, int *ind, struct AppContext* app) {
     }
     
     // Draw score text in top-left corner using our custom text drawing function
-    draw_text(pixel_buf, 10, 10, score_text, 255, 255, 255);
+    draw_text(pixel_buf, 10, 10, score_text, 127, 127, 127);
 }
+
 
 ///////////////////
 // Ignore below here, this is all example code 
