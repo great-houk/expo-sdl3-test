@@ -18,33 +18,6 @@
 
 static int ind = 0;
 
-// Custom random number generator using Linear Congruential Generator (LCG)
-// These constants are from Numerical Recipes
-static unsigned long next = 1;
-static const unsigned long a = 1664525;
-static const unsigned long c = 1013904223;
-static const unsigned long m = 4294967295; // 2^32 - 1
-
-// Initialize the random number generator with a seed
-void init_random(unsigned long seed) {
-    next = seed;
-}
-
-// Generate a random number between 0 and m-1
-unsigned long random() {
-    next = (a * next + c) % m;
-    return next;
-}
-
-// Generate a random number between min and max (inclusive)
-int random_range(int min, int max) {
-    return min + (random() % (max - min + 1));
-}
-
-// Generate a random float between 0.0 and 1.0
-float random_float() {
-    return (float)random() / m;
-}
 
 struct AppContext {
     SDL_Window* window;
@@ -77,6 +50,34 @@ struct Player player = {
     false,      // invulnerable
     0           // invulnerable_timer
 };
+
+// Custom random number generator using Linear Congruential Generator (LCG)
+// These constants are from Numerical Recipes
+static unsigned long next = 1;
+static const unsigned long a = 1664525;
+static const unsigned long c = 1013904223;
+static const unsigned long m = 4294967295; // 2^32 - 1
+
+// Initialize the random number generator with a seed
+void init_random(unsigned long seed) {
+    next = seed;
+}
+
+// Generate a random number between 0 and m-1
+unsigned long random() {
+    next = (a * next + c) % m;
+    return next;
+}
+
+// Generate a random number between min and max (inclusive)
+int random_range(int min, int max) {
+    return min + (random() % (max - min + 1));
+}
+
+// Generate a random float between 0.0 and 1.0
+float random_float() {
+    return (float)random() / m;
+}
 
 // Function to generate a random speed within a range
 float generate_random_speed() {
@@ -380,14 +381,6 @@ void draw_player(char *pixel_buf, float x, float y, float rotation) {
     }
 }
 
-// Function to draw text
-void draw_text(char *pixel_buf, const char* text, int x, int y, char r, char g, char b) {
-    int len = strlen(text);
-    for (int i = 0; i < len; i++) {
-        // Draw each character as a simple rectangle
-        draw_rect(pixel_buf, x + i * 6, y, 5, 8, r, g, b);
-    }
-}
 
 // Runs once at startup
 void init(char *pixel_buf, int *ind) {
@@ -471,9 +464,13 @@ void update(char *pixel_buf, int *ind, struct AppContext* app) {
                 player.invulnerable_timer = 1000;
                 
                 if (player.lives <= 0) {
-                    // Game over - exit program
-                    app->app_quit = SDL_APP_SUCCESS;
-                    return;
+                    player.lives = 5;
+                    player.score = 0;
+                    player.x = WIDTH / 2;
+                    player.y = HEIGHT / 2;
+                    player.velocity_x = 0;
+                    player.velocity_y = 0;
+                    player.rotation = 0;             
                 }
                 
                 // Break out of the loop to prevent multiple collisions in the same frame
@@ -497,9 +494,6 @@ void update(char *pixel_buf, int *ind, struct AppContext* app) {
     // Draw score
     char score_text[32];
     sprintf(score_text, "Score: %d", player.score);
-    
-    // Draw score in top-left corner
-    draw_text(pixel_buf, score_text, 0, 0, 127, 127, 127);
     
     // Draw lives as rectangles in top-right corner
     const int life_rect_size = 8;
