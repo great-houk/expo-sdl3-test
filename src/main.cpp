@@ -15,9 +15,36 @@
 #include <string_view>
 #include <cmath> // For fmod function
 #include <stdio.h> // For printf function
-#include <stdlib.h> // For rand function
 
 static int ind = 0;
+
+// Custom random number generator using Linear Congruential Generator (LCG)
+// These constants are from Numerical Recipes
+static unsigned long next = 1;
+static const unsigned long a = 1664525;
+static const unsigned long c = 1013904223;
+static const unsigned long m = 4294967295; // 2^32 - 1
+
+// Initialize the random number generator with a seed
+void init_random(unsigned long seed) {
+    next = seed;
+}
+
+// Generate a random number between 0 and m-1
+unsigned long random() {
+    next = (a * next + c) % m;
+    return next;
+}
+
+// Generate a random number between min and max (inclusive)
+int random_range(int min, int max) {
+    return min + (random() % (max - min + 1));
+}
+
+// Generate a random float between 0.0 and 1.0
+float random_float() {
+    return (float)random() / m;
+}
 
 struct AppContext {
     SDL_Window* window;
@@ -54,7 +81,7 @@ struct Player player = {
 // Function to generate a random speed of either 0.1 or -0.1
 float generate_random_speed() {
     // Generate a random number between 0 and 1
-    float random_value = (float)rand() / RAND_MAX;
+    float random_value = random_float();
     
     // Return either 0.03 or -0.03 based on the random value (much slower than before)
     return (random_value < 0.5f) ? 0.03f : -0.03f;
@@ -204,8 +231,8 @@ void check_bullet_collisions(char *pixel_buf) {
                 
                 // Try to find a position that's far from the player
                 for (int attempts = 0; attempts < 10; attempts++) {
-                    new_x = (rand() % (WIDTH - 10)) + 1;
-                    new_y = (rand() % (HEIGHT - 10)) + 1;
+                    new_x = random_range(1, WIDTH - 10);
+                    new_y = random_range(1, HEIGHT - 10);
                     
                     // Check distance from player
                     float player_dx = new_x - player.x;
@@ -221,8 +248,8 @@ void check_bullet_collisions(char *pixel_buf) {
                 
                 // If we couldn't find a valid position, just use a random one
                 if (!valid_position) {
-                    new_x = (rand() % (WIDTH - 10)) + 1;
-                    new_y = (rand() % (HEIGHT - 10)) + 1;
+                    new_x = random_range(1, WIDTH - 10);
+                    new_y = random_range(1, HEIGHT - 10);
                 }
                 
                 // Update asteroid position and speed
@@ -367,15 +394,15 @@ void draw_text(char *pixel_buf, const char* text, int x, int y, char r, char g, 
 // Runs once at startup
 void init(char *pixel_buf, int *ind) {
     // Set a fixed seed for reproducibility
-    srand(42);
+    init_random(42);
     
     // Set background to black
     draw_rect(pixel_buf, 0, 0, WIDTH, HEIGHT, 0, 0, 0);
     
     // Initialize the asteroid with random speeds
     for (int i = 0; i < MAX_ASTEROIDS; i++) {
-        float rand_x = (rand() % (WIDTH - 10)) + 1;
-        float rand_y = (rand() % (HEIGHT - 10)) + 1;
+        float rand_x = random_range(1, WIDTH - 10);
+        float rand_y = random_range(1, HEIGHT - 10);
         float rand_speed_x = generate_random_speed();
         float rand_speed_y = generate_random_speed();
         init_asteroid(pixel_buf, rand_x, rand_y, 10, 10, rand_speed_x, rand_speed_y);
@@ -450,8 +477,6 @@ void update(char *pixel_buf, int *ind, struct AppContext* app) {
                     app->app_quit = SDL_APP_SUCCESS;
                     return;
                 }
-                // No position reset at all - player stays where they are
-                // No asteroid reset at all - asteroids stay where they are
                 
                 // Break out of the loop to prevent multiple collisions in the same frame
                 break;
