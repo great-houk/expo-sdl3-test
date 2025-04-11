@@ -8,6 +8,7 @@
 #define FRICTION 0.995f
 #define M_PI 3.14159265358979323846
 #define MAX_BULLETS 1000
+#define GAME_OVER_DURATION 1000
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
@@ -223,7 +224,7 @@ void update_bullets(char *pixel_buf) {
         // Draw the bullet (yellow)
         int draw_x = (int)bullets[i].x;
         int draw_y = (int)bullets[i].y;
-        draw_rect(pixel_buf, draw_x, draw_y, 2, 2, 255, 255, 0);
+        draw_rect(pixel_buf, draw_x, draw_y, 2, 2, 127, 127, 0);
     }
 }
 
@@ -592,17 +593,21 @@ void handle_events(EVENTS *key_events) {
         
     if (key_events->left_flag) {
         player.rotation -= ROTATION_SPEED;
+        printf("%d\n", key_events->left_flag);
     }
     if (key_events->right_flag) {
         player.rotation += ROTATION_SPEED;
+        printf("%d\n", key_events->right_flag);
     }
     if (key_events->thrust_flag) {
         // Apply thrust in the direction the ship is facing
+        printf("%d\n", key_events->thrust_flag);
         player.velocity_x += sin(rad) * THRUST_ACCELERATION;
         player.velocity_y -= cos(rad) * THRUST_ACCELERATION;
     }
     if (key_events->shoot_flag) {
         // Calculate the position at the front of the ship
+        printf("%d\n", key_events->shoot_flag);
         float ship_size = 8.0f; // Same as in draw_player
         float bullet_x = player.x + sin(rad) * ship_size;
         float bullet_y = player.y - cos(rad) * ship_size;
@@ -615,6 +620,62 @@ void handle_events(EVENTS *key_events) {
 void update(char *pixel_buf, int *ind, struct AppContext* app) {
     // Clear the screen
     draw_rect(pixel_buf, 0, 0, WIDTH, HEIGHT, 0, 0, 0);
+
+    // Static variable to track game over state
+    static int game_over_timer = 0;
+    static bool game_over = false;
+
+    struct EVENTS key_events;
+    EVENTS events = control_handler(&key_events);
+    handle_events(&key_events);
+
+    
+    // Check if game is over
+    if (player.lives <= 0) {
+        game_over = true;
+        game_over_timer = GAME_OVER_DURATION;
+    }
+
+    // Handle game over state
+    if (game_over) {
+        // Draw "GAME OVER" message in the center of the screen
+        draw_text(pixel_buf, WIDTH / 2 - 40, HEIGHT / 2 - 10, "GAME OVER", 127, 0, 0);
+        
+        // Decrement game over timer
+        game_over_timer--;
+        
+        // If game over timer has expired, reset the game
+        if (game_over_timer <= 0) {
+            game_over = false;
+            
+            // Reset player position and state
+            player.x = WIDTH / 2;
+            player.y = HEIGHT / 2;
+            player.velocity_x = 0;
+            player.velocity_y = 0;
+            player.rotation = 0;
+            player.lives = 3;
+            player.score = 0;
+            player.invulnerable = false;
+            player.invulnerable_timer = 0;
+            
+            // Reset asteroids
+            asteroid_count = 0;
+            for (int i = 0; i < MAX_ASTEROIDS; i++) {
+                float rand_x = random_range(1, WIDTH - 10);
+                float rand_y = random_range(1, HEIGHT - 10);
+                float rand_speed_x = generate_random_speed();
+                float rand_speed_y = generate_random_speed();
+                init_asteroid(pixel_buf, rand_x, rand_y, 10, 10, rand_speed_x, rand_speed_y);
+            }
+            
+            // Clear bullets
+            bullet_count = 0;
+        }
+        
+        // Don't update game state while in game over screen
+        return;
+    }
 
     struct EVENTS key_events;
     EVENTS events = control_handler(&key_events);
@@ -673,16 +734,6 @@ void update(char *pixel_buf, int *ind, struct AppContext* app) {
                 player.invulnerable = true;
                 player.invulnerable_timer = 1000;
                 
-                if (player.lives <= 0) {
-                    player.lives = 5;
-                    player.score = 0;
-                    player.x = WIDTH / 2;
-                    player.y = HEIGHT / 2;
-                    player.velocity_x = 0;
-                    player.velocity_y = 0;
-                    player.rotation = 0;             
-                }
-                
                 // Break out of the loop to prevent multiple collisions in the same frame
                 break;
             }
@@ -705,20 +756,30 @@ void update(char *pixel_buf, int *ind, struct AppContext* app) {
     char score_text[32];
     sprintf(score_text, "Score: %d", player.score);
     
-    // Draw lives as rectangles in top-right corner
+    // Draw lives as ship cursors in top-right corner
     const int life_rect_size = 8;
     const int life_rect_spacing = 2;
     const int life_rect_y = 5;
     
     for (int i = 0; i < player.lives; i++) {
         int life_rect_x = WIDTH - (i + 1) * (life_rect_size + life_rect_spacing);
-        draw_rect(pixel_buf, life_rect_x, life_rect_y, life_rect_size, life_rect_size, 127, 127, 127);
+        draw_ship_cursor(pixel_buf, life_rect_x, life_rect_y);
     }
     
     // Draw score text in top-left corner using our custom text drawing function
     draw_text(pixel_buf, 10, 10, score_text, 127, 127, 127);
 }
 
+// Function to draw a small ship cursor for lives display
+void draw_ship_cursor(char *pixel_buf, int x, int y) {
+    // Draw a small ship shape (triangle)
+    // Main body
+    draw_rect(pixel_buf, x, y, 3, 3, 127, 127, 127);
+    // Left wing
+    draw_rect(pixel_buf, x-1, y+1, 2, 1, 127, 127, 127);
+    // Right wing
+    draw_rect(pixel_buf, x+2, y+1, 2, 1, 127, 127, 127);
+}
 
 ///////////////////
 // Ignore below here, this is all example code 
